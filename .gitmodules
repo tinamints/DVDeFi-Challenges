@@ -30,10 +30,7 @@
 	path = lib/multicall
 	url = https://github.com/mds1/multicall
 	ignore = dirty
-[submodule "lib/safe-smart-account"]
-	path = lib/safe-smart-account
-	url = https://github.com/safe-global/safe-smart-account
-	ignore = dirty
+
 [submodule "lib/murky"]
 	path = lib/murky
 	url = https://github.com/dmfxyz/murky
