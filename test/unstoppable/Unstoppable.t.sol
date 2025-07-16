@@ -91,7 +91,7 @@ contract UnstoppableChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_unstoppable() public checkSolvedByPlayer {
-        //transfer a token to the vault
+        //NOTE (tina): transfer a token to the vault
         token.transfer(address(vault), 1);
         
     }
