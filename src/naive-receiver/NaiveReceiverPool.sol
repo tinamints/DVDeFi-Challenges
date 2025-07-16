@@ -50,7 +50,7 @@ contract NaiveReceiverPool is Multicall, IERC3156FlashLender {
         weth.transfer(address(receiver), amount);
         totalDeposits -= amount;
         
-        //this line smells fishy🤔
+        //this line smell fishy
 
         if (receiver.onFlashLoan(msg.sender, address(weth), amount, FIXED_FEE, data) != CALLBACK_SUCCESS) {
             revert CallbackFailed();
