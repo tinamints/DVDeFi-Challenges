@@ -50,7 +50,12 @@ contract NaiveReceiverPool is Multicall, IERC3156FlashLender {
         weth.transfer(address(receiver), amount);
         totalDeposits -= amount;
         
-        //this line smell fishy
+        //NOTE (tina): this line below is the vunerable line👇👇👇
+        //it checks if the callback from 'receiver' is successful or not and it requires 5 inputs parameters
+        //one of them being 'data' means there's a possibility we can create arbitrary encoded data and exploit this
+        //after checking 'onflashloan' in receiver's contract then..BINGO, the 1st parameter there being 'address' not 'msg.sender'
+        //meaning we can encode attack-data, put receiver's address as the borrower and then call from our contract
+        //see the full solution in the test file
 
         if (receiver.onFlashLoan(msg.sender, address(weth), amount, FIXED_FEE, data) != CALLBACK_SUCCESS) {
             revert CallbackFailed();
