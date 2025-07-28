@@ -35,6 +35,11 @@ contract SideEntranceLenderPool {
     function flashLoan(uint256 amount) external {
         uint256 balanceBefore = address(this).balance;
 
+        //NOTE (tina): this line is the vulnerable line👇👇👇
+        //this line  being executed at the same time as the flashLoan() function
+        //we can use this to our advantage 
+        //see the full solution in the test file
+
         IFlashLoanEtherReceiver(msg.sender).execute{value: amount}();
 
         if (address(this).balance < balanceBefore) {

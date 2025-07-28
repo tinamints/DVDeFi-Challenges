@@ -94,6 +94,7 @@ contract UnstoppableChallenge is Test {
         //NOTE (tina): transfer a token to the vault to increase 'balanceBefore'
         token.transfer(address(vault), 1);
         
+        //this is why the exploit works: 'totalSupply' only increase when someone send token via 'deposit' function
     }
 
     /**

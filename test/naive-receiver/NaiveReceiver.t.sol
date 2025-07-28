@@ -78,7 +78,8 @@ contract NaiveReceiverChallenge is Test {
      */
     function test_naiveReceiver() public checkSolvedByPlayer {
     
-        //NOTE (tina):Step 1:create encoded data to drain the receiver's balance using multicall
+        //NOTE (tina):have to solve this with two or less transactions
+        //Step 1:create encoded data to drain the receiver's balance using multicall
         //the pool takes 1 fee per time so we have to call 10 times
         bytes[] memory data = new bytes[](10);
         for (uint256 i = 0; i < 10; i++) {

