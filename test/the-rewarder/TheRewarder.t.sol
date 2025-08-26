@@ -235,7 +235,7 @@ contract TheRewarderChallenge is Test {
         dvt.transfer(recovery, dvt.balanceOf(player));
         weth.transfer(recovery, weth.balanceOf(player));
 
-        // This is why the exploit works: there's no AlreadyClaimed error in claimRewards() for the same token
+        // This is why the exploit works: there's no AlreadyClaimed error in claimRewards() when using the same token multiple times
     }
 
     /**
