@@ -67,7 +67,7 @@ contract TheRewarderDistributor {
 
         emit NewDistribution(token, batchNumber, newRoot, amount);
     }
-
+   
     function clean(IERC20[] calldata tokens) external {
         for (uint256 i = 0; i < tokens.length; i++) {
             IERC20 token = tokens[i];
@@ -99,6 +99,7 @@ contract TheRewarderDistributor {
                 bitsSet = 1 << bitPosition; // set bit at given position
                 amount = inputClaim.amount;
             } else {
+                //NOTE (tina): there is no AlreadyClaimed error in is else block (the same token) 
                 bitsSet = bitsSet | 1 << bitPosition;
                 amount += inputClaim.amount;
             }
@@ -112,11 +113,9 @@ contract TheRewarderDistributor {
             bytes32 root = distributions[token].roots[inputClaim.batchNumber];
 
             if (!MerkleProof.verify(inputClaim.proof, root, leaf)) revert InvalidProof();
-
             inputTokens[inputClaim.tokenIndex].transfer(msg.sender, inputClaim.amount);
         }
     }
-
     function _setClaimed(IERC20 token, uint256 amount, uint256 wordPosition, uint256 newBits) private returns (bool) {
         uint256 currentWord = distributions[token].claims[msg.sender][wordPosition];
         if ((currentWord & newBits) != 0) return false;

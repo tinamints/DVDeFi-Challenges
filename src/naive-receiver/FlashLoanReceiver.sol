@@ -12,7 +12,7 @@ contract FlashLoanReceiver is IERC3156FlashBorrower {
         pool = _pool;
     }
 
-    //NOTE (tina):the first parameter is 'address' meanwhile in the pool's contract it's 'msg.sender'??
+    
     function onFlashLoan(address, address token, uint256 amount, uint256 fee, bytes calldata)
         external
         returns (bytes32)

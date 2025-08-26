@@ -26,9 +26,9 @@ contract TrusterLenderPool is ReentrancyGuard {
         uint256 balanceBefore = token.balanceOf(address(this));
 
         token.transfer(borrower, amount);
-        //NOTE (tina): 'target' can be any address?!...yum~
+        //NOTE (tina): 'target' can be any address
         target.functionCall(data);
-        //this line is causing arithmetic underflow or overflow
+        
         if (token.balanceOf(address(this)) < balanceBefore) {
             revert RepayFailed();
         }

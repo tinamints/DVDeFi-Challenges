@@ -7,6 +7,7 @@ import {DamnValuableVotes} from "../../src/DamnValuableVotes.sol";
 import {SimpleGovernance} from "../../src/selfie/SimpleGovernance.sol";
 import {SelfiePool} from "../../src/selfie/SelfiePool.sol";
 
+
 contract SelfieChallenge is Test {
     address deployer = makeAddr("deployer");
     address player = makeAddr("player");
@@ -62,7 +63,7 @@ contract SelfieChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_selfie() public checkSolvedByPlayer {
-        
+       
     }
 
     /**
@@ -71,6 +72,10 @@ contract SelfieChallenge is Test {
     function _isSolved() private view {
         // Player has taken all tokens from the pool
         assertEq(token.balanceOf(address(pool)), 0, "Pool still has tokens");
-        assertEq(token.balanceOf(recovery), TOKENS_IN_POOL, "Not enough tokens in recovery account");
+        assertEq(
+            token.balanceOf(recovery),
+            TOKENS_IN_POOL,
+            "Not enough tokens in recovery account"
+        );
     }
 }

@@ -67,7 +67,7 @@ contract SelfiePool is IERC3156FlashLender, ReentrancyGuard {
 
         return true;
     }
-
+    //NOTE (tina): let's exploit this function by being the governance and encode data to call emergencyExit() then call flashLoan() to drain funds
     function emergencyExit(address receiver) external onlyGovernance {
         uint256 amount = token.balanceOf(address(this));
         token.transfer(receiver, amount);

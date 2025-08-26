@@ -83,13 +83,9 @@ contract UnstoppableVault is IERC3156FlashLender, ReentrancyGuard, Owned, ERC462
         if (address(asset) != _token) revert UnsupportedCurrency(); // enforce ERC3156 requirement
         uint256 balanceBefore = totalAssets();
 
-        //NOTE (tina):this line below is the vulnerability👇👇👇
-        //we can make 'convertToShares(totalSupply) != balanceBefore' true, to make it revert and stop giving flashloan(mission complete)
+        //NOTE (tina): we can make 'convertToShares(totalSupply) != balanceBefore' true
         //in ERC4626, 'totalSupply' only changes when someone send token via 'deposit function'
         //meanwhile 'balanceBefore' is the actual balance of the vault, can increase when someone send token(even without using 'deposit function')
-        //so all we have to do is to send token to the vault without using 'deposit function'
-        //see the solution in the test file 
-
         if (convertToShares(totalSupply) != balanceBefore) revert InvalidBalance(); // enforce ERC4626 requirement
 
         // transfer tokens out + execute callback on receiver

