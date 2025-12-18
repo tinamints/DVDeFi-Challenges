@@ -2,8 +2,8 @@
 **Goal:** Become a web3 security researcher by solving all challenges.
 
 ## Progress
-- 5/15 challenges solved
--  Current focus: Selfie
+- 6/15 challenges solved
+-  Current focus: Compromised
 
 ## Key Lessons
 -  Flash loans: always be careful with what’s passed in calldata [from NaiveReceiver challenge]
