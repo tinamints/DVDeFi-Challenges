@@ -83,7 +83,7 @@ contract SideEntranceChallenge is Test {
 
         exploit.exploit();
 
-        //this is why the exploit works: 'execute' function gets called during the flash loan
+        //this is why the exploit works: 'execute' function gets called during the flash loan giving an opportunity to deposit the borrowed funds back to get ‘balance’ then get the right to call withdraw
     }
 
     /**

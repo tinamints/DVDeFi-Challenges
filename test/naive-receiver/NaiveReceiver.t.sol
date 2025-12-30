@@ -94,13 +94,14 @@ contract NaiveReceiverChallenge is Test {
         pool.multicall(data);
 
         //drain the pool's funds 
-        //in flashLoan function 'deposits[feeReceiver] += FIXED_FEE' meaning only 'feeReceiver' can call 'withdraw'
+        //in flashLoan function 'deposits[feeReceiver] += FIXED_FEE' meaning 'feeReceiver' has deposits
+        //and in withdraw function 'deposits[_msgSender()] -= amount;' meaning only someone with positive deposits can withdraw
         //and in the test's check pool's config 'assertEq(pool.feeReceiver(), deployer)' means'feeReceiver=deployer'
         vm.startPrank(address(deployer));
         pool.withdraw(weth.balanceOf(address(pool)), payable(recovery));
         vm.stopPrank();
        
-       //this is why the exploit works: anyone can force the receiver to pay fees, and only the feeReceiver can withdraw the accumulated WETH
+       //this is why the exploit works: anyone can force the receiver to pay fees, and imposonate the feeReceiver to withdraw the accumulated WETH
     }
 
         

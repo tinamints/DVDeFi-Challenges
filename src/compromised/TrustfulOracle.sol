@@ -35,7 +35,7 @@ contract TrustfulOracle is AccessControlEnumerable {
             _grantRole(INITIALIZER_ROLE, msg.sender);
         }
     }
-
+    
     // A handy utility allowing the deployer to setup initial prices (only once)
     function setupInitialPrices(address[] calldata sources, string[] calldata symbols, uint256[] calldata prices)
         external
@@ -51,7 +51,7 @@ contract TrustfulOracle is AccessControlEnumerable {
         }
         renounceRole(INITIALIZER_ROLE, msg.sender);
     }
-
+    //NOTE (tina):will exploit this function
     function postPrice(string calldata symbol, uint256 newPrice) external onlyRole(TRUSTED_SOURCE_ROLE) {
         _setPrice(msg.sender, symbol, newPrice);
     }
@@ -81,7 +81,6 @@ contract TrustfulOracle is AccessControlEnumerable {
         _pricesBySource[source][symbol] = newPrice;
         emit UpdatedPrice(source, symbol, oldPrice, newPrice);
     }
-
     function _computeMedianPrice(string memory symbol) private view returns (uint256) {
         uint256[] memory prices = getAllPricesForSymbol(symbol);
         LibSort.insertionSort(prices);
