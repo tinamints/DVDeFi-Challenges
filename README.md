@@ -2,11 +2,12 @@
 **Goal:** Become a web3 security researcher by solving all challenges.
 
 ## Progress
-- 7/15 challenges solved
--  Current focus: Puppet
+- 8/15 challenges solved
+-  Current focus: Puppet V2
 
 ## Key Lessons
--  Flash loans: always be careful with what’s passed in calldata [from NaiveReceiver challenge]
+- always be careful with what’s passed in calldata [from NaiveReceiver challenge]
+- often times the vulnerability is in the calculation [from Compromised challenge]
 
 
 ## Learn with me

