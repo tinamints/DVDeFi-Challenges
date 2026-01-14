@@ -37,6 +37,7 @@ contract PuppetV2Pool {
         uint256 amount = calculateDepositOfWETHRequired(borrowAmount);
 
         // Take the WETH
+        //NOTE (tina): no 0 amount check?
         _weth.transferFrom(msg.sender, address(this), amount);
 
         // internal accounting
