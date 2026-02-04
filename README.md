@@ -2,8 +2,8 @@
 **Goal:** Become a web3 security researcher by solving all challenges.
 
 ## Progress
-- 8/15 challenges solved
--  Current focus: Puppet V2
+- 10/15 challenges solved
+-  Current focus: backdoor
 
 ## Key Lessons
 - always be careful with what’s passed in calldata [from NaiveReceiver challenge]

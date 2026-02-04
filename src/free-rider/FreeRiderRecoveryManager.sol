@@ -25,6 +25,7 @@ contract FreeRiderRecoveryManager is ReentrancyGuard, IERC721Receiver {
         if (msg.value != _bounty) {
             revert NotEnoughFunds();
         }
+        // note (tina) :above means i need to send 45 eth when call this but i have 0.1 so have to 1.use flashloan in pair contract?
         bounty = _bounty;
         beneficiary = _beneficiary;
         nft = IERC721(_nft);
@@ -33,6 +34,7 @@ contract FreeRiderRecoveryManager is ReentrancyGuard, IERC721Receiver {
 
     // Read https://eips.ethereum.org/EIPS/eip-721 for more info on this function
     function onERC721Received(address, address, uint256 _tokenId, bytes memory _data)
+    
         external
         override
         nonReentrant
@@ -41,7 +43,7 @@ contract FreeRiderRecoveryManager is ReentrancyGuard, IERC721Receiver {
         if (msg.sender != address(nft)) {
             revert CallerNotNFT();
         }
-
+        
         if (tx.origin != beneficiary) {
             revert OriginNotBeneficiary();
         }
@@ -53,7 +55,7 @@ contract FreeRiderRecoveryManager is ReentrancyGuard, IERC721Receiver {
         if (nft.ownerOf(_tokenId) != address(this)) {
             revert StillNotOwningToken(_tokenId);
         }
-
+       
         if (++received == 6) {
             address recipient = abi.decode(_data, (address));
             payable(recipient).sendValue(bounty);
