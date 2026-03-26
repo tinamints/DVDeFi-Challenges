@@ -2,8 +2,8 @@
 **Goal:** Become a web3 security researcher by solving all challenges.
 
 ## Progress
-- 10/15 challenges solved
--  Current focus: backdoor
+- 11/18 challenges solved
+-  Current focus: climber
 
 ## Key Lessons
 - always be careful with what’s passed in calldata [from NaiveReceiver challenge]
