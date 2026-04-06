@@ -90,7 +90,7 @@ contract ClimberTimelock is ClimberTimelockBase {
         for (uint8 i = 0; i < targets.length; ++i) {
             targets[i].functionCallWithValue(dataElements[i], values[i]);
         }
-
+        //NOTE (tina): this check-after-execute ordering is the critical vulnerability
         if (getOperationState(id) != OperationState.ReadyForExecution) {
             revert NotReadyForExecution(id);
         }

