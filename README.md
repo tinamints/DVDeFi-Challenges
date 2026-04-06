@@ -2,8 +2,8 @@
 **Goal:** Become a web3 security researcher by solving all challenges.
 
 ## Progress
-- 11/18 challenges solved
--  Current focus: climber
+- 12/18 challenges solved
+-  Current focus: wallet mining
 
 ## Key Lessons
 - always be careful with what’s passed in calldata [from NaiveReceiver challenge]
