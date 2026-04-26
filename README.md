@@ -1,5 +1,8 @@
 # My DVDeFi Journey
-**Goal:** Become a web3 security researcher by solving all challenges.
+**Goal:** Understand smart contract's vulnerability concepts and DeFi system by solving all challenges and writing writeups.
+
+## writeups
+i have writeups in 3 languages TH/JA/EN check them out!
 
 ## Progress
 - 12/18 challenges solved
