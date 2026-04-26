@@ -15,8 +15,8 @@ You can explore the codebase in the following order and read my code annotations
 > Annotations are marked with '>Note (tina):' or '//NOTE (tina):'.
 ### exploring order
 1. The challenge's README.md
-2. The challenge's main contract
-3. The challenge's test file
+2. The challenge's test file
+3. The challenge's main contract and helper contracts
 
 
 ## How i solve these challenges

