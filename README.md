@@ -5,8 +5,8 @@
 i have writeups in 3 languages TH/JA/EN check them out!
 
 ## Progress
-- 12/18 challenges solved
--  Current focus: wallet mining
+- 13/18 challenges solved
+-  Current focus: puppet v3
 
 ## Key Lessons
 - always be careful with what’s passed in calldata [from NaiveReceiver challenge]

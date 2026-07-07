@@ -5,9 +5,9 @@ pragma solidity =0.8.25;
 contract AuthorizerUpgradeable {
     uint256 public needsInit = 1;
     mapping(address => mapping(address => uint256)) private wards;
-
+//NOTE (tina): indexed is searchable in logs. EVM stores it as a topic
     event Rely(address indexed usr, address aim);
-
+//NOTE (tina): constructor never run via proxy so as long as it's called via prox = Can call init()
     constructor() {
         needsInit = 0; // freeze implementation
     }

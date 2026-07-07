@@ -45,11 +45,16 @@ contract WalletDeployer {
      * @notice Allows the caller to deploy a new Safe account and receive a payment in return.
      *         If the authorizer is set, the caller must be authorized to execute the deployment
      */
+     //NOTE (tina): wat (bytes) — the initializer calldata. This is the encoded function call that gets executed on the new Safe proxy right after it's deployed   
+        //   calling setup(...) to configure owners and threshold (owners = [user address]
+        //threshold = 1).
+        //   - num (uint256) — the salt nonce. This is what makes the deployed address deterministic — the same wat + num combo always produces the same contract    
+        //   address via CREATE2.
     function drop(address aim, bytes memory wat, uint256 num) external returns (bool) {
         if (mom != address(0) && !can(msg.sender, aim)) {
             return false;
         }
-
+                                
         if (address(cook.createProxyWithNonce(cpy, wat, num)) != aim) {
             return false;
         }

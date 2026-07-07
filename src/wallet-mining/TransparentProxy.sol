@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Damn Vulnerable DeFi v4 (https://damnvulnerabledefi.xyz)
 pragma solidity =0.8.25;
-
+//NOTE (tina):to prevent storage collisions between a proxy contract and its underlying logic
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {AuthorizerUpgradeable} from "./AuthorizerUpgradeable.sol";
@@ -24,7 +24,7 @@ contract TransparentProxy is ERC1967Proxy {
     function isUpgrader(address who) public view returns (bool) {
         return who == upgrader;
     }
-
+//NOTE (tina): the admin can call only the fixed () and anyone else can call any function in the implementation contract.
     function _fallback() internal override {
         if (isUpgrader(msg.sender)) {
             require(msg.sig == bytes4(keccak256("upgradeToAndCall(address, bytes)")));
